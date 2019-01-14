@@ -1,0 +1,91 @@
+---
+title: "Machine Learning Project"
+author: "Jared Cassibba"
+date: "January 14, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+library(randomForest)
+```
+
+#read in training and testing data
+```{r}
+train <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+test <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+
+names(train)
+str(train)
+summary(train)
+```
+#this is the outcome we want to predict
+```{r}
+summary(train$classe)
+```
+#we want to predict the 'classe' variable using any other variable to predict with
+```{r}
+inTrain <- createDataPartition(y=train$classe, p=0.6, list=FALSE)
+myTrain <- train[inTrain, ]
+myTest <- train[-inTrain, ]
+dim(myTrain)
+
+dim(myTest)
+```
+#some exploratory plots
+```{r}
+featurePlot(x=train[, 150:159], y = train$classe, plot = 'pairs')
+```
+#first we will remove variables with mostly NAs (use threshold of >75%)
+```{r}
+mytrain_SUB <- myTrain
+for (i in 1:length(myTrain)) {
+  if (sum(is.na(myTrain[ , i])) / nrow(myTrain) >= .75) {
+    for (j in 1:length(mytrain_SUB)) {
+      if (length(grep(names(myTrain[i]), names(mytrain_SUB)[j]))==1) {
+        mytrain_SUB <- mytrain_SUB[ , -j]
+      }
+    }
+  }
+}
+
+dim(mytrain_SUB)
+names(mytrain_SUB)
+```
+#remove columns that are obviously not predictors
+```{r}
+mytrain_SUB2 <- mytrain_SUB[,8:length(mytrain_SUB)]
+```
+#remove variables with near zero variance
+```{r}
+NZV <- nearZeroVar(mytrain_SUB2, saveMetrics = TRUE)
+
+keep <- names(mytrain_SUB2)
+```
+
+#Random Forest Model
+#fit model- RANDOM FOREST
+```{r}
+set.seed(3)
+modFit <- randomForest(classe~., data = mytrain_SUB2)
+print(modFit)
+```
+#cross validation on my testing data
+#out of sample error
+```{r}
+predict1 <- predict(modFit, myTest, type = "class")
+confusionMatrix(myTest$classe, predict1)
+```
+#in sample error
+```{r}
+predict_train <- predict(modFit, myTrain, type = "class")
+confusionMatrix(myTrain$classe, predict_train)
+
+predict_FINAL <- predict(modFit, test, type = "class")
+print(predict_FINAL)
+```
